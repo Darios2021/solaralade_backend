@@ -1,4 +1,4 @@
-FROM node:20-alpine AS build
+FROM node:20-alpine
 
 WORKDIR /usr/src/app
 
@@ -7,14 +7,8 @@ RUN npm install --production
 
 COPY . .
 
-# -------- Runtime --------
-FROM node:20-alpine
-
-WORKDIR /usr/src/app
-
-COPY --from=build /usr/src/app /usr/src/app
-
 ENV NODE_ENV=production
+ENV PORT=4000
 
 EXPOSE 4000
 
