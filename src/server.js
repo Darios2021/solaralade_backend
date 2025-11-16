@@ -1,8 +1,9 @@
+// src/server.js
 require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
 const { testConnection, sequelize } = require('./config/db')
-const leadRoutes = require('./routes/leadRoutes')
+const leadRoutes = require('./router/leadRoutes')
 
 const app = express()
 
