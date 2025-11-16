@@ -12,5 +12,4 @@ ENV PORT=4000
 
 EXPOSE 4000
 
-# 👇 OJO: ahora apuntamos a src/server.js
 CMD ["node", "src/server.js"]

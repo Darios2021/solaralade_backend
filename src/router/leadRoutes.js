@@ -3,12 +3,10 @@ const Lead = require('../models/Lead')
 
 const router = express.Router()
 
-// Healthcheck específico de leads
 router.get('/health', (req, res) => {
   res.json({ ok: true, message: 'Leads API OK' })
 })
 
-// Crear nuevo lead
 router.post('/', async (req, res) => {
   try {
     const {
@@ -60,7 +58,6 @@ router.post('/', async (req, res) => {
   }
 })
 
-// (Opcional) obtener un lead por id
 router.get('/:id', async (req, res) => {
   try {
     const lead = await Lead.findByPk(req.params.id)

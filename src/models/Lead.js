@@ -10,7 +10,6 @@ const Lead = sequelize.define(
       autoIncrement: true,
     },
 
-    // Datos personales
     firstName: {
       type: DataTypes.STRING(100),
       allowNull: false,
@@ -29,7 +28,6 @@ const Lead = sequelize.define(
       allowNull: false,
     },
 
-    // Ubicación
     city: {
       type: DataTypes.STRING(120),
       allowNull: true,
@@ -44,19 +42,15 @@ const Lead = sequelize.define(
       defaultValue: 'Argentina',
     },
 
-    // Info del proyecto
     systemPurpose: {
-      // ¿Para qué querés un sistema solar?
       type: DataTypes.STRING(255),
       allowNull: true,
     },
     usageType: {
-      // Esto es para: casa, comercio, empresa, etc.
       type: DataTypes.STRING(255),
       allowNull: true,
     },
     averageBill: {
-      // factura promedio estimada (opcional)
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
     },
@@ -65,7 +59,6 @@ const Lead = sequelize.define(
       allowNull: true,
     },
 
-    // Gestión comercial
     source: {
       type: DataTypes.STRING(100),
       allowNull: true,
