@@ -1,9 +1,9 @@
-// src/models/SolarLead.js
+// src/models/Lead.js
 const { DataTypes } = require('sequelize')
 const { sequelize } = require('../config/db')
 
-const SolarLead = sequelize.define(
-  'SolarLead',
+const Lead = sequelize.define(
+  'Lead',
   {
     id: {
       type: DataTypes.INTEGER,
@@ -102,6 +102,33 @@ const SolarLead = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true,
     },
+
+    // --- Campos CRM internos ---
+    // Estado del lead en el funnel: nuevo, contactado, ganado, etc.
+    crmStatus: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+    // Responsable / comercial asignado
+    assignedTo: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
+    // Notas internas del CRM
+    internalNotes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    // Última vez que alguien lo contactó
+    lastContactAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    // Próxima acción / recordatorio
+    nextActionAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
   },
   {
     tableName: 'solar_leads',
@@ -109,4 +136,4 @@ const SolarLead = sequelize.define(
   }
 )
 
-module.exports = SolarLead
+module.exports = Lead
