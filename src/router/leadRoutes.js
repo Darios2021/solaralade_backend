@@ -1,9 +1,9 @@
 // src/router/leadRoutes.js
 const express = require('express')
 const router = express.Router()
-const { SolarLead } = require('../models')
+const { Lead } = require('../models')
 
-// Handler compartido para crear el lead
+// Handler compartido para / y /solar
 async function createLead(req, res) {
   try {
     const { location = {}, project = {}, contact = {}, meta = {} } = req.body || {}
@@ -46,7 +46,7 @@ async function createLead(req, res) {
       rawMetaJson: JSON.stringify(meta || {}),
     }
 
-    const lead = await SolarLead.create(leadToCreate)
+    const lead = await Lead.create(leadToCreate)
 
     return res.status(201).json({
       ok: true,
@@ -66,7 +66,7 @@ async function createLead(req, res) {
 // POST /api/leads
 router.post('/', createLead)
 
-// POST /api/leads/solar  (la que usa tu frontend actual)
+// POST /api/leads/solar (la que usa el front)
 router.post('/solar', createLead)
 
 module.exports = router

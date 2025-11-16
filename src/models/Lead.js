@@ -1,84 +1,112 @@
+// src/models/SolarLead.js
 const { DataTypes } = require('sequelize')
 const { sequelize } = require('../config/db')
 
-const Lead = sequelize.define(
-  'Lead',
+const SolarLead = sequelize.define(
+  'SolarLead',
   {
     id: {
-      type: DataTypes.INTEGER.UNSIGNED,
-      primaryKey: true,
+      type: DataTypes.INTEGER,
       autoIncrement: true,
+      primaryKey: true,
     },
 
-    firstName: {
-      type: DataTypes.STRING(100),
-      allowNull: false,
+    // --- Ubicación ---
+    city: {
+      type: DataTypes.STRING,
+      allowNull: true,
     },
-    lastName: {
-      type: DataTypes.STRING(100),
+    provinceCode: {
+      type: DataTypes.STRING(10),
+      allowNull: true,
+    },
+    provinceName: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    countryCode: {
+      type: DataTypes.STRING(5),
+      allowNull: true,
+    },
+    countryName: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    // --- Proyecto ---
+    purposeCode: {
+      type: DataTypes.STRING(10),
+      allowNull: true,
+    },
+    purposeLabel: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    purposeDriver: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+    usageCode: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+    },
+    usageLabel: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    segment: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+    monthlyBillArs: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: true,
+    },
+    estimatedMonthlyKwh: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    estimatedSystemSizeKw: {
+      type: DataTypes.DECIMAL(6, 2),
+      allowNull: true,
+    },
+    priority: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+
+    // --- Contacto ---
+    fullName: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    phone: {
+      type: DataTypes.STRING,
       allowNull: true,
     },
     email: {
-      type: DataTypes.STRING(150),
-      allowNull: false,
-      validate: { isEmail: true },
-    },
-    phone: {
-      type: DataTypes.STRING(50),
-      allowNull: false,
+      type: DataTypes.STRING,
+      allowNull: true,
     },
 
-    city: {
-      type: DataTypes.STRING(120),
-      allowNull: true,
-    },
-    province: {
-      type: DataTypes.STRING(120),
-      allowNull: true,
-    },
-    country: {
-      type: DataTypes.STRING(120),
-      allowNull: true,
-      defaultValue: 'Argentina',
-    },
-
-    systemPurpose: {
-      type: DataTypes.STRING(255),
-      allowNull: true,
-    },
-    usageType: {
-      type: DataTypes.STRING(255),
-      allowNull: true,
-    },
-    averageBill: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: true,
-    },
-    notes: {
+    // --- Meta / tracking ---
+    sourceUrl: {
       type: DataTypes.TEXT,
       allowNull: true,
     },
-
-    source: {
+    sourceTag: {
       type: DataTypes.STRING(100),
       allowNull: true,
-      defaultValue: 'web-grupoalade',
     },
-    status: {
-      type: DataTypes.ENUM(
-        'nuevo',
-        'contactado',
-        'en_proceso',
-        'cerrado',
-        'descartado'
-      ),
-      allowNull: false,
-      defaultValue: 'nuevo',
+    rawMetaJson: {
+      type: DataTypes.TEXT,
+      allowNull: true,
     },
   },
   {
     tableName: 'solar_leads',
+    timestamps: true, // createdAt y updatedAt
   }
 )
 
-module.exports = Lead
+module.exports = SolarLead
