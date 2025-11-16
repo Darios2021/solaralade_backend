@@ -1,74 +1,65 @@
-const express = require('express')
-const Lead = require('../models/Lead')
+// src/router/leadRoutes.js
+const express = require('express');
+const router = express.Router();
+const { SolarLead } = require('../models');
 
-const router = express.Router()
-
-router.get('/health', (req, res) => {
-  res.json({ ok: true, message: 'Leads API OK' })
-})
-
-router.post('/', async (req, res) => {
+// Handler compartido para crear el lead
+async function createLead(req, res) {
   try {
-    const {
-      firstName,
-      lastName,
-      email,
-      phone,
-      city,
-      province,
-      country,
-      systemPurpose,
-      usageType,
-      averageBill,
-      notes,
-    } = req.body
+    const { location = {}, project = {}, contact = {}, meta = {} } = req.body || {};
 
-    if (!firstName || !email || !phone) {
-      return res.status(400).json({
-        ok: false,
-        message: 'Nombre, email y teléfono son obligatorios',
-      })
-    }
+    const leadToCreate = {
+      // Ubicación
+      city: location.city || null,
+      provinceCode: location.provinceCode || null,
+      provinceName: location.provinceName || null,
+      countryCode: location.countryCode || null,
+      countryName: location.countryName || null,
 
-    const lead = await Lead.create({
-      firstName,
-      lastName,
-      email,
-      phone,
-      city,
-      province,
-      country,
-      systemPurpose,
-      usageType,
-      averageBill,
-      notes,
-    })
+      // Proyecto
+      purposeCode: project.purposeCode || null,
+      purposeLabel: project.purposeLabel || null,
+      purposeDriver: project.purposeDriver || null,
+      usageCode: project.usageCode || null,
+      usageLabel: project.usageLabel || null,
+      segment: project.segment || null,
+      monthlyBillArs: project.monthlyBillArs ?? null,
+      estimatedMonthlyKwh: project.estimatedMonthlyKwh ?? null,
+      estimatedSystemSizeKw: project.estimatedSystemSizeKw ?? null,
+      priority: project.priority || null,
 
-    res.status(201).json({
+      // Contacto
+      fullName: contact.fullName || null,
+      phone: contact.phone || null,
+      email: contact.email || null,
+
+      // Meta
+      sourceUrl: meta.sourceUrl || null,
+      sourceTag: meta.sourceTag || null,
+      rawMetaJson: JSON.stringify(meta || {}),
+    };
+
+    const lead = await SolarLead.create(leadToCreate);
+
+    return res.status(201).json({
       ok: true,
       message: 'Lead creado correctamente',
-      data: { id: lead.id },
-    })
+      lead,
+    });
   } catch (err) {
-    console.error('[API] Error al crear lead:', err)
-    res.status(500).json({
+    console.error('[leadRoutes] Error al crear lead:', err);
+    return res.status(500).json({
       ok: false,
-      message: 'Error interno al crear el lead',
-    })
+      message: 'Error al registrar el lead',
+      error: err.message || 'Internal server error',
+    });
   }
-})
+}
 
-router.get('/:id', async (req, res) => {
-  try {
-    const lead = await Lead.findByPk(req.params.id)
-    if (!lead) {
-      return res.status(404).json({ ok: false, message: 'Lead no encontrado' })
-    }
-    res.json({ ok: true, data: lead })
-  } catch (err) {
-    console.error('[API] Error al obtener lead:', err)
-    res.status(500).json({ ok: false, message: 'Error interno' })
-  }
-})
+// Acepta POST /api/leads
+router.post('/', createLead);
 
-module.exports = router
+// Acepta POST /api/leads/solar (para lo que ya está usando el frontend)
+router.post('/solar', createLead);
+
+module.exports = router;
