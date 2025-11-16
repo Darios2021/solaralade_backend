@@ -14,6 +14,8 @@ app.use(
       'https://www.grupoalade.com',
       'https://solar-calculator.cingulado.org',
       'http://localhost:5173',
+      'http://localhost:3000', // 👉 tu panel en dev
+      // 'https://TU-DOMINIO-DEL-PANEL', // 👉 cuando lo tengas en producción, lo sumás acá
     ],
   })
 )

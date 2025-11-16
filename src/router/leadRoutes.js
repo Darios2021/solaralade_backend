@@ -62,8 +62,8 @@ router.post('/solar', async (req, res) => {
   }
 })
 
-// ----------------- Listar leads (para panel admin) -----------------
-router.get('/', async (req, res) => {
+// Función helper para listar leads (la usamos en / y en /solar)
+async function listarLeads(req, res) {
   try {
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1)
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100)
@@ -106,7 +106,13 @@ router.get('/', async (req, res) => {
       error: err.message,
     })
   }
-})
+}
+
+// ----------------- Listar leads (para panel admin) -----------------
+router.get('/', listarLeads)
+
+// ----------------- Listar leads (alias /solar para el panel) -------
+router.get('/solar', listarLeads)
 
 // ----------------- Obtener lead por ID -----------------
 router.get('/:id', async (req, res) => {
