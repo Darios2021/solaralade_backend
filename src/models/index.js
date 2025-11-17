@@ -4,35 +4,11 @@ const ChatSession = require('./ChatSession')
 const ChatMessage = require('./ChatMessage')
 const ChatEvent = require('./ChatEvent')
 
-// Lead → ChatSession (a futuro, si querés vincular)
-Lead.hasMany(ChatSession, {
-  foreignKey: 'leadId',
-  as: 'chatSessions',
-})
-ChatSession.belongsTo(Lead, {
-  foreignKey: 'leadId',
-  as: 'lead',
-})
-
-// ChatSession ↔ ChatMessage
-ChatSession.hasMany(ChatMessage, {
-  foreignKey: 'sessionId',
-  as: 'messages',
-})
-ChatMessage.belongsTo(ChatSession, {
-  foreignKey: 'sessionId',
-  as: 'session',
-})
-
-// ChatSession ↔ ChatEvent
-ChatSession.hasMany(ChatEvent, {
-  foreignKey: 'sessionId',
-  as: 'events',
-})
-ChatEvent.belongsTo(ChatSession, {
-  foreignKey: 'sessionId',
-  as: 'session',
-})
+// ⚠️ Importante:
+// De momento NO definimos asociaciones hasMany/belongsTo
+// para evitar el error de "hasMany called with something that's not a subclass...".
+// Los endpoints de chat trabajan con sessionId directamente, así que
+// podemos operar sin asociaciones hasta estabilizar el modelo.
 
 module.exports = {
   Lead,
