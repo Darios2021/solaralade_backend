@@ -2,12 +2,9 @@
 const Lead = require('./Lead')
 const ChatSession = require('./ChatSession')
 const ChatMessage = require('./ChatMessage')
+const ChatEvent = require('./ChatEvent')
 
-// =======================
-// Relaciones
-// =======================
-
-// Lead → ChatSession (un lead puede tener muchos chats)
+// Lead → ChatSession (a futuro, si querés vincular)
 Lead.hasMany(ChatSession, {
   foreignKey: 'leadId',
   as: 'chatSessions',
@@ -17,7 +14,7 @@ ChatSession.belongsTo(Lead, {
   as: 'lead',
 })
 
-// ChatSession ↔ ChatMessage (una sesión tiene muchos mensajes)
+// ChatSession ↔ ChatMessage
 ChatSession.hasMany(ChatMessage, {
   foreignKey: 'sessionId',
   as: 'messages',
@@ -27,8 +24,19 @@ ChatMessage.belongsTo(ChatSession, {
   as: 'session',
 })
 
+// ChatSession ↔ ChatEvent
+ChatSession.hasMany(ChatEvent, {
+  foreignKey: 'sessionId',
+  as: 'events',
+})
+ChatEvent.belongsTo(ChatSession, {
+  foreignKey: 'sessionId',
+  as: 'session',
+})
+
 module.exports = {
   Lead,
   ChatSession,
   ChatMessage,
+  ChatEvent,
 }
