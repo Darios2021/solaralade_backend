@@ -23,7 +23,26 @@ router.post('/solar', async (req, res) => {
     const location = body.location || {}
     const project = body.project || {}
     const contact = body.contact || {}
-    const meta = body.meta || {}
+    const metaFromClient = body.meta || {}
+
+    // Meta adicional calculada en el servidor (IP, UA, fecha)
+    const ipHeader = req.headers['x-forwarded-for'] || req.socket.remoteAddress || null
+    const ip =
+      typeof ipHeader === 'string'
+        ? ipHeader.split(',')[0].trim()
+        : ipHeader
+
+    const serverMeta = {
+      ip: ip || null,
+      userAgent: req.headers['user-agent'] || null,
+      receivedAtIso: new Date().toISOString(),
+    }
+
+    // Meta final que guardamos en rawMetaJson
+    const fullMeta = {
+      ...metaFromClient,
+      server: serverMeta,
+    }
 
     const lead = await Lead.create({
       // Ubicación
@@ -51,9 +70,9 @@ router.post('/solar', async (req, res) => {
       email: contact.email ?? null,
 
       // Meta
-      sourceUrl: meta.sourceUrl ?? null,
-      sourceTag: meta.sourceTag ?? null,
-      rawMetaJson: JSON.stringify(meta || {}),
+      sourceUrl: metaFromClient.sourceUrl ?? null,
+      sourceTag: metaFromClient.sourceTag ?? null,
+      rawMetaJson: JSON.stringify(fullMeta || {}),
 
       // CRM inicial
       crmStatus: 'nuevo',

@@ -110,6 +110,8 @@ const Lead = sequelize.define(
       type: DataTypes.STRING(100),
       allowNull: true,
     },
+
+    // Aquí guardamos TODO el JSON con meta de frontend + servidor
     rawMetaJson: {
       type: DataTypes.TEXT,
       allowNull: true,
