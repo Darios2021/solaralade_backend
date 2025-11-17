@@ -15,6 +15,61 @@ const EDITABLE_CRM_FIELDS = [
   'nextActionAt',
 ]
 
+/**
+ * Lookup de geolocalización por IP usando ip-api.com
+ * Docs: http://ip-api.com/docs/api:json
+ *
+ * IMPORTANTE:
+ * - Esto asume Node 18+ con fetch global disponible.
+ *   Si tu runtime es más viejo, tenés que agregar un polyfill (node-fetch, etc.).
+ */
+async function lookupIpGeo (ip) {
+  if (!ip) return null
+
+  try {
+    const url = `http://ip-api.com/json/${encodeURIComponent(
+      ip,
+    )}?fields=status,country,countryCode,regionName,region,city,zip,lat,lon,isp,org,as,timezone,query`
+
+    // Timeout corto para no trabar el endpoint si el servicio externo falla
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 1200)
+
+    const res = await fetch(url, { signal: controller.signal })
+    clearTimeout(timeout)
+
+    if (!res.ok) {
+      console.error('[leads] ip-api.com HTTP error:', res.status)
+      return null
+    }
+
+    const data = await res.json()
+    if (!data || data.status !== 'success') {
+      return null
+    }
+
+    // Normalizamos a un objeto más prolijo
+    return {
+      ip: data.query || ip,
+      country: data.country || null,
+      countryCode: data.countryCode || null,
+      region: data.regionName || null,
+      regionCode: data.region || null,
+      city: data.city || null,
+      zip: data.zip || null,
+      lat: data.lat ?? null,
+      lon: data.lon ?? null,
+      isp: data.isp || null,
+      org: data.org || null,
+      as: data.as || null,
+      timezone: data.timezone || null,
+    }
+  } catch (err) {
+    console.error('[leads] IP geo lookup error:', err.message || err)
+    return null
+  }
+}
+
 // ----------------- Crear lead desde el simulador -----------------
 router.post('/solar', async (req, res) => {
   try {
@@ -25,18 +80,23 @@ router.post('/solar', async (req, res) => {
     const contact = body.contact || {}
     const metaFromClient = body.meta || {}
 
-    // Meta adicional calculada en el servidor (IP, UA, idioma, fecha)
+    // IP desde el header o el socket
     const ipHeader = req.headers['x-forwarded-for'] || req.socket.remoteAddress || null
     const ip =
       typeof ipHeader === 'string'
         ? ipHeader.split(',')[0].trim()
         : ipHeader
 
+    // Geo por IP (best effort: si falla, seguimos igual)
+    const ipGeo = await lookupIpGeo(ip)
+
+    // Meta adicional calculada en el servidor (IP, UA, Accept-Language, fecha, geo)
     const serverMeta = {
       ip: ip || null,
       userAgent: req.headers['user-agent'] || null,
       acceptLanguage: req.headers['accept-language'] || null,
       receivedAtIso: new Date().toISOString(),
+      ipGeo: ipGeo || null,
     }
 
     // Meta final que guardamos en rawMetaJson
@@ -60,27 +120,39 @@ router.post('/solar', async (req, res) => {
       usageCode: project.usageCode ?? null,
       usageLabel: project.usageLabel ?? null,
       segment: project.segment ?? null,
+      propertyType: project.propertyType ?? null,
+
       monthlyBillArs: project.monthlyBillArs ?? null,
       estimatedMonthlyKwh: project.estimatedMonthlyKwh ?? null,
       estimatedSystemSizeKw: project.estimatedSystemSizeKw ?? null,
       priority: project.priority ?? null,
+
+      // Resultados del cálculo solar (si llegan)
+      estimatedPanels: project.estimatedPanels ?? null,
+      estimatedInverterKw: project.estimatedInverterKw ?? null,
+      estimatedYearlyKwh: project.estimatedYearlyKwh ?? null,
+      estimatedYearlySavingsArs: project.estimatedYearlySavingsArs ?? null,
+      paybackYears: project.paybackYears ?? null,
 
       // Contacto
       fullName: contact.fullName ?? null,
       phone: contact.phone ?? null,
       email: contact.email ?? null,
 
-      // Meta
+      // Meta / tracking digital
       sourceUrl: metaFromClient.sourceUrl ?? null,
       sourceTag: metaFromClient.sourceTag ?? null,
       rawMetaJson: JSON.stringify(fullMeta || {}),
 
-      // CRM inicial
-      crmStatus: 'nuevo',
-      assignedTo: null,
-      internalNotes: null,
-      lastContactAt: null,
-      nextActionAt: null,
+      // CRM inicial (si vienen datos desde el simulador)
+      crmStatus: (body.crm && body.crm.crmStatus) || 'nuevo',
+      crmScore: (body.crm && body.crm.crmScore) ?? null,
+      assignedTo: (body.crm && body.crm.assignedTo) ?? null,
+      internalNotes: (body.crm && body.crm.internalNotes) ?? null,
+      lastContactAt: (body.crm && body.crm.lastContactAt) ?? null,
+      nextActionAt: (body.crm && body.crm.nextActionAt) ?? null,
+      nextActionType: (body.crm && body.crm.nextActionType) ?? null,
+      tags: (body.crm && body.crm.tags) ?? null,
     })
 
     return res.json({
@@ -102,7 +174,10 @@ router.post('/solar', async (req, res) => {
 async function listarLeads (req, res) {
   try {
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1)
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100)
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit, 10) || 50, 1),
+      100,
+    )
     const search = (req.query.search || '').trim()
 
     const offset = (page - 1) * limit
