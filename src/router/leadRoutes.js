@@ -25,7 +25,7 @@ router.post('/solar', async (req, res) => {
     const contact = body.contact || {}
     const metaFromClient = body.meta || {}
 
-    // Meta adicional calculada en el servidor (IP, UA, fecha)
+    // Meta adicional calculada en el servidor (IP, UA, idioma, fecha)
     const ipHeader = req.headers['x-forwarded-for'] || req.socket.remoteAddress || null
     const ip =
       typeof ipHeader === 'string'
@@ -35,6 +35,7 @@ router.post('/solar', async (req, res) => {
     const serverMeta = {
       ip: ip || null,
       userAgent: req.headers['user-agent'] || null,
+      acceptLanguage: req.headers['accept-language'] || null,
       receivedAtIso: new Date().toISOString(),
     }
 
@@ -98,7 +99,7 @@ router.post('/solar', async (req, res) => {
 })
 
 // ----------------- Helper: listar leads -----------------
-async function listarLeads(req, res) {
+async function listarLeads (req, res) {
   try {
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1)
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100)
