@@ -3,7 +3,12 @@ require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
 const { testConnection, sequelize } = require('./config/db')
+
+// Importar modelos para que Sequelize los registre
+require('./models')
+
 const leadRoutes = require('./router/leadRoutes')
+const chatRoutes = require('./router/chatRoutes')
 
 const app = express()
 
@@ -13,10 +18,9 @@ app.use(
       'https://grupoalade.com',
       'https://www.grupoalade.com',
       'https://solar-calculator.cingulado.org',
-      'https://aladeapp.cingulado.org',      // 👉 NUEVO: panel Vue en producción
-      'http://localhost:5173',               // 👉 panel en dev (Vite)
-      'http://localhost:3000',               // 👉 otra opción dev
-      // 'https://TU-DOMINIO-DEL-PANEL',     // 👉 cuando lo tengas en producción, lo sumás acá si cambia
+      'https://aladeapp.cingulado.org',
+      'http://localhost:5173',
+      'http://localhost:3000',
     ],
   })
 )
@@ -27,12 +31,23 @@ app.get('/', (req, res) => {
   res.json({ ok: true, message: 'API Solar Calculator funcionando' })
 })
 
+// 🔹 Ruta de prueba para verificar deploy
+app.get('/api/chat/ping', (req, res) => {
+  res.json({ ok: true, message: 'chat API viva' })
+})
+
+// Rutas existentes
 app.use('/api/leads', leadRoutes)
+
+// 🔹 API de chat (sesiones + mensajes)
+app.use('/api/chat', chatRoutes)
 
 const PORT = process.env.PORT || 4000
 
-async function start() {
+async function start () {
   await testConnection()
+
+  // Sincroniza modelos (Lead, ChatSession, ChatMessage, etc.)
   await sequelize.sync({ alter: true })
   console.log('[DB] Migraciones sincronizadas')
 
