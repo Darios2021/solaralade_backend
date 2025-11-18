@@ -3,31 +3,11 @@ const express = require('express')
 const router = express.Router()
 const { ChatSession, ChatMessage } = require('../models')
 
-// Helpers JSON
-function safeJson (obj) {
-  if (!obj) return null
-  try {
-    return JSON.stringify(obj)
-  } catch (e) {
-    return null
-  }
-}
-
-function safeParse (str) {
-  if (!str) return null
-  try {
-    return JSON.parse(str)
-  } catch (e) {
-    return null
-  }
-}
-
-// =====================
-// CREAR SESIÓN
-// =====================
+// Crear sesión de chat
 router.post('/session', async (req, res) => {
   try {
     const { contact = {}, meta = {}, leadId = null } = req.body || {}
+
     const now = new Date()
 
     const session = await ChatSession.create({
@@ -39,13 +19,13 @@ router.post('/session', async (req, res) => {
       startedAt: now,
       lastActivityAt: now,
 
-      sourceUrl: meta.sourceUrl || meta.url || null,
+      sourceUrl: meta.sourceUrl || null,
       userAgent: meta.userAgent || req.headers['user-agent'] || null,
       language: meta.language || null,
-      screen: meta.screen ? JSON.stringify(meta.screen) : null,
+      screen: meta.screen || null,
       fingerprint: meta.fingerprint || null,
       ipAddress: req.ip || null,
-      metaJson: safeJson(meta),
+      metaJson: meta ? JSON.stringify(meta) : null,
     })
 
     res.json({ ok: true, session })
@@ -55,9 +35,7 @@ router.post('/session', async (req, res) => {
   }
 })
 
-// =====================
-// ACTUALIZAR CONTACTO
-// =====================
+// Actualizar datos de contacto de la sesión (opcional)
 router.patch('/session/:id/contact', async (req, res) => {
   try {
     const { id } = req.params
@@ -84,9 +62,7 @@ router.patch('/session/:id/contact', async (req, res) => {
   }
 })
 
-// =====================
-// GUARDAR MENSAJE
-// =====================
+// Guardar mensaje
 router.post('/message', async (req, res) => {
   try {
     const { sessionId, text, sender = 'user', meta = null } = req.body || {}
@@ -106,7 +82,7 @@ router.post('/message', async (req, res) => {
       sessionId,
       sender,
       text,
-      metaJson: safeJson(meta),
+      metaJson: meta ? JSON.stringify(meta) : null,
     })
 
     session.lastActivityAt = new Date()
@@ -119,41 +95,25 @@ router.post('/message', async (req, res) => {
   }
 })
 
-// =====================
-// LISTAR SESIONES
-// =====================
+// Listar sesiones (para el CRM)
 router.get('/sessions', async (req, res) => {
   try {
     const sessions = await ChatSession.findAll({
+      // 🔴 ANTES: order: [['lastActivityAt', 'DESC']],
+      // ✅ AHORA: usamos updatedAt que siempre existe
       order: [['updatedAt', 'DESC']],
     })
-
-    const result = sessions.map(s => ({
-      id: s.id,
-      status: s.status,
-      name: s.name,
-      email: s.email,
-      phone: s.phone,
-      sourceUrl: s.sourceUrl,
-      lastActivityAt: s.lastActivityAt || s.updatedAt,
-      meta: safeParse(s.metaJson),
-      createdAt: s.createdAt,
-      updatedAt: s.updatedAt,
-    }))
-
-    res.json({ ok: true, sessions: result })
+    res.json({ ok: true, sessions })
   } catch (err) {
     console.error('Error listando sesiones de chat:', err)
     res.status(500).json({ ok: false, error: 'Error listando sesiones' })
   }
 })
 
-// =====================
-// MENSAJES DE UNA SESIÓN
-// =====================
+// Traer mensajes de una sesión
 router.get('/sessions/:id/messages', async (req, res) => {
   try {
-    const id = Number(req.params.id)
+    const { id } = req.params
 
     const session = await ChatSession.findByPk(id)
     if (!session) {
@@ -162,32 +122,10 @@ router.get('/sessions/:id/messages', async (req, res) => {
 
     const messages = await ChatMessage.findAll({
       where: { sessionId: id },
-      // 🔴 Antes: order: [['createdAt', 'ASC']]
-      // ✅ Ahora: ordenamos por id (columna que seguro existe)
-      order: [['id', 'ASC']],
+      order: [['createdAt', 'ASC']],
     })
 
-    const result = messages.map(m => ({
-      id: m.id,
-      sessionId: m.sessionId,
-      sender: m.sender,
-      text: m.text,
-      meta: safeParse(m.metaJson),
-      createdAt: m.createdAt,
-      updatedAt: m.updatedAt,
-    }))
-
-    res.json({
-      ok: true,
-      session: {
-        id: session.id,
-        status: session.status,
-        name: session.name,
-        email: session.email,
-        phone: session.phone,
-      },
-      messages: result,
-    })
+    res.json({ ok: true, session, messages })
   } catch (err) {
     console.error('Error obteniendo mensajes de chat:', err)
     res
