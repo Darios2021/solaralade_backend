@@ -3,7 +3,7 @@ const express = require('express')
 const router = express.Router()
 const { ChatSession, ChatMessage } = require('../models')
 
-// Helper para serializar / parsear meta
+// Helpers JSON
 function safeJson (obj) {
   if (!obj) return null
   try {
@@ -22,13 +22,12 @@ function safeParse (str) {
   }
 }
 
-// =======================================
-//  CREAR SESIÓN
-// =======================================
+// =====================
+// CREAR SESIÓN
+// =====================
 router.post('/session', async (req, res) => {
   try {
     const { contact = {}, meta = {}, leadId = null } = req.body || {}
-
     const now = new Date()
 
     const session = await ChatSession.create({
@@ -56,9 +55,9 @@ router.post('/session', async (req, res) => {
   }
 })
 
-// =======================================
-//  ACTUALIZAR CONTACTO
-// =======================================
+// =====================
+// ACTUALIZAR CONTACTO
+// =====================
 router.patch('/session/:id/contact', async (req, res) => {
   try {
     const { id } = req.params
@@ -85,9 +84,9 @@ router.patch('/session/:id/contact', async (req, res) => {
   }
 })
 
-// =======================================
-//  GUARDAR MENSAJE
-// =======================================
+// =====================
+// GUARDAR MENSAJE
+// =====================
 router.post('/message', async (req, res) => {
   try {
     const { sessionId, text, sender = 'user', meta = null } = req.body || {}
@@ -120,16 +119,15 @@ router.post('/message', async (req, res) => {
   }
 })
 
-// =======================================
-//  LISTAR SESIONES (para el CRM)
-// =======================================
+// =====================
+// LISTAR SESIONES
+// =====================
 router.get('/sessions', async (req, res) => {
   try {
     const sessions = await ChatSession.findAll({
       order: [['updatedAt', 'DESC']],
     })
 
-    // Opcional: adaptar un poco el shape que ve el front
     const result = sessions.map(s => ({
       id: s.id,
       status: s.status,
@@ -150,9 +148,9 @@ router.get('/sessions', async (req, res) => {
   }
 })
 
-// =======================================
-//  TRAER MENSAJES DE UNA SESIÓN
-// =======================================
+// =====================
+// MENSAJES DE UNA SESIÓN
+// =====================
 router.get('/sessions/:id/messages', async (req, res) => {
   try {
     const id = Number(req.params.id)
@@ -164,7 +162,9 @@ router.get('/sessions/:id/messages', async (req, res) => {
 
     const messages = await ChatMessage.findAll({
       where: { sessionId: id },
-      order: [['createdAt', 'ASC']],
+      // 🔴 Antes: order: [['createdAt', 'ASC']]
+      // ✅ Ahora: ordenamos por id (columna que seguro existe)
+      order: [['id', 'ASC']],
     })
 
     const result = messages.map(m => ({
