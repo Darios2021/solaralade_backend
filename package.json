@@ -13,6 +13,7 @@
     "express": "^4.21.2",
     "mysql2": "^3.11.3",
     "sequelize": "^6.37.3",
+    "socket.io": "^4.8.1",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

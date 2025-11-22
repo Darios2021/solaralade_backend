@@ -2,61 +2,118 @@
 require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
+const http = require('http')
+const { Server } = require('socket.io')
 const { testConnection, sequelize } = require('./config/db')
 
-// Importar modelos para que Sequelize los registre
+// Importar modelos (Sequelize los registra)
 require('./models')
 
+// Rutas
 const leadRoutes = require('./router/leadRoutes')
 const chatRoutes = require('./router/chatRoutes')
 
+// ============================
+// EXPRESS APP
+// ============================
 const app = express()
+
+// ============================
+// CORS HTTP + WS
+// ============================
+const allowedOrigins = [
+  'https://grupoalade.com',
+  'https://www.grupoalade.com',
+  'https://solar-calculator.cingulado.org',
+  'https://aladeapp.cingulado.org',
+  'http://localhost:5173',
+  'http://localhost:3000',
+]
 
 app.use(
   cors({
-    origin: [
-      'https://grupoalade.com',
-      'https://www.grupoalade.com',
-      'https://solar-calculator.cingulado.org',
-      'https://aladeapp.cingulado.org',
-      'http://localhost:5173',
-      'http://localhost:3000',
-    ],
+    origin: allowedOrigins,
+    credentials: true,
   })
 )
 
 app.use(express.json())
 
+// ============================
+// RUTAS HTTP
+// ============================
 app.get('/', (req, res) => {
   res.json({ ok: true, message: 'API Solar Calculator funcionando' })
 })
 
-// 🔹 Ruta de prueba para verificar deploy
+// Prueba
 app.get('/api/chat/ping', (req, res) => {
   res.json({ ok: true, message: 'chat API viva' })
 })
 
-// Rutas existentes
 app.use('/api/leads', leadRoutes)
-
-// 🔹 API de chat (sesiones + mensajes)
 app.use('/api/chat', chatRoutes)
 
+// ============================
+// HTTP SERVER + SOCKET.IO
+// ============================
+const server = http.createServer(app)
+
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+  },
+})
+
+// Manejo de WebSocket
+io.on('connection', socket => {
+  console.log('🟢 Socket conectado:', socket.id)
+
+  socket.on('joinSession', ({ sessionId }) => {
+    if (!sessionId) return
+    socket.join(sessionId)
+    socket.data.sessionId = sessionId
+    console.log(`👉 ${socket.id} entró a la sesión ${sessionId}`)
+  })
+
+  socket.on('chatMessage', payload => {
+    const { sessionId } = payload
+    if (!sessionId) return
+
+    io.to(sessionId).emit('chatMessage', {
+      ...payload,
+      createdAt: new Date().toISOString(),
+    })
+  })
+
+  socket.on('disconnect', () => {
+    console.log('🔴 Socket desconectado:', socket.id)
+  })
+})
+
+// ============================
+// START SERVER
+// ============================
 const PORT = process.env.PORT || 4000
 
-async function start () {
-  await testConnection()
+async function start() {
+  try {
+    await testConnection()
 
-  // Sincroniza modelos (Lead, ChatSession, ChatMessage, etc.)
-  await sequelize.sync({ alter: true })
-  console.log('[DB] Migraciones sincronizadas')
+    // Migraciones automáticas
+    await sequelize.sync({ alter: true })
+    console.log('[DB] Migraciones sincronizadas')
 
-  app.listen(PORT, () => {
-    console.log(`[API] Escuchando en puerto ${PORT}`)
-  })
+    server.listen(PORT, () => {
+      console.log(`[API+WS] Escuchando en puerto ${PORT}`)
+    })
+  } catch (err) {
+    console.error('[API] Error al iniciar:', err)
+    process.exit(1)
+  }
 }
 
-start().catch(err => {
-  console.error('[API] Error al iniciar el servidor:', err)
-  process.exit(1)
-})
+start()
+
+module.exports = { app, server, io }
