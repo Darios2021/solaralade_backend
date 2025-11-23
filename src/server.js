@@ -1,4 +1,4 @@
-// server.js
+// src/server.js
 require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
@@ -46,6 +46,7 @@ app.get('/', (req, res) => {
   res.json({ ok: true, message: 'API Solar Calculator funcionando' })
 })
 
+// Prueba
 app.get('/api/chat/ping', (req, res) => {
   res.json({ ok: true, message: 'chat API viva' })
 })
@@ -65,36 +66,63 @@ const io = new Server(server, {
   },
 })
 
-// hacemos visible io dentro de las rutas
-app.set('io', io)
-
 // Manejo de WebSocket
 io.on('connection', socket => {
-  console.log('🟢 Socket conectado:', socket.id)
+  const role = (socket.handshake.query && socket.handshake.query.role) || 'widget'
 
+  console.log('🟢 Socket conectado:', socket.id, 'role =', role)
+
+  // Metemos a todos en rooms lógicas por rol
+  if (role === 'agent') {
+    socket.join('agents')
+  } else {
+    socket.join('widgets')
+  }
+
+  // (la room por sesión queda disponible si la querés usar más adelante)
   socket.on('joinSession', ({ sessionId }) => {
     if (!sessionId) return
-    const roomId = String(sessionId)
-    socket.join(roomId)
-    socket.data.sessionId = roomId
-    console.log(`👉 ${socket.id} entró a la sesión ${roomId}`)
+    const room = String(sessionId)
+    socket.join(room)
+    socket.data.sessionId = room
+    console.log(`👉 ${socket.id} entró a la sesión ${room}`)
   })
 
+  // Mensajes de chat
   socket.on('chatMessage', payload => {
-    const sessionId = payload?.sessionId
+    if (!payload) return
+
+    const sessionId = String(payload.sessionId || '')
     if (!sessionId) return
 
-    const roomId = String(sessionId)
+    const from = payload.from || payload.sender || 'user'
 
-    io.to(roomId).emit('chatMessage', {
+    const baseMsg = {
       ...payload,
-      sessionId: roomId,
+      sessionId,
+      from,
       createdAt: new Date().toISOString(),
-    })
+    }
+
+    // Log para depurar
+    console.log('💬 chatMessage recibido:', baseMsg)
+
+    // Si viene del AGENTE -> se lo mando a todos los widgets
+    if (from === 'agent') {
+      // a todos los widgets menos el emisor (que es un agente)
+      socket.to('widgets').emit('chatMessage', baseMsg)
+    } else {
+      // Viene del usuario/widget/bot -> se lo mando a TODOS los agentes (CRM)
+      socket.to('agents').emit('chatMessage', baseMsg)
+    }
+
+    // Opcional: si querés que los participantes de esa sesión
+    // también lo reciban por la room de la sesión:
+    // io.to(sessionId).emit('chatMessage', baseMsg)
   })
 
   socket.on('disconnect', () => {
-    console.log('🔴 Socket desconectado:', socket.id)
+    console.log('🔴 Socket desconectado:', socket.id, 'role =', role)
   })
 })
 
