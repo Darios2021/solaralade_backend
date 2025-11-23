@@ -11,7 +11,7 @@ require('./models')
 
 // Rutas
 const leadRoutes = require('./router/leadRoutes')
-const createChatRoutes = require('./router/chatRoutes')
+const chatRoutes = require('./router/chatRoutes')
 
 // ============================
 // EXPRESS APP
@@ -40,19 +40,19 @@ app.use(
 app.use(express.json())
 
 // ============================
-// RUTAS HTTP BÁSICAS
+// RUTAS HTTP
 // ============================
 app.get('/', (req, res) => {
   res.json({ ok: true, message: 'API Solar Calculator funcionando' })
 })
 
-// ping simple de chat
+// Prueba
 app.get('/api/chat/ping', (req, res) => {
   res.json({ ok: true, message: 'chat API viva' })
 })
 
-// Leads (HTTP puro)
 app.use('/api/leads', leadRoutes)
+app.use('/api/chat', chatRoutes)
 
 // ============================
 // HTTP SERVER + SOCKET.IO
@@ -68,40 +68,46 @@ const io = new Server(server, {
 
 // Manejo de WebSocket
 io.on('connection', socket => {
-  console.log('🟢 Socket conectado:', socket.id)
+  const role = socket.handshake?.auth?.role || 'unknown'
+  console.log('🟢 Socket conectado:', socket.id, 'role=', role)
 
+  // Lo dejo por si a futuro querés rooms, pero hoy no dependemos de esto
   socket.on('joinSession', ({ sessionId }) => {
     if (!sessionId) return
-    const room = String(sessionId)
-    socket.join(room)
-    socket.data.sessionId = room
-    console.log(`👉 ${socket.id} entró a la sesión ${room}`)
+    socket.join(sessionId)
+    socket.data.sessionId = sessionId
+    console.log(`👉 ${socket.id} entró a la sesión ${sessionId}`)
   })
 
   socket.on('chatMessage', payload => {
     const { sessionId } = payload || {}
-    if (!sessionId) return
 
-    const room = String(sessionId)
-
-    io.to(room).emit('chatMessage', {
+    const enriched = {
       ...payload,
-      sessionId: room,
+      sessionId: sessionId || socket.data.sessionId || null,
       createdAt: new Date().toISOString(),
-    })
+    }
+
+    if (!enriched.sessionId) {
+      console.warn(
+        '[WS] chatMessage SIN sessionId, payload=',
+        JSON.stringify(payload),
+      )
+    } else {
+      console.log(
+        `[WS] chatMessage de ${socket.id} role=${role} → sesión ${enriched.sessionId}:`,
+        enriched.message || enriched.text,
+      )
+    }
+
+    // 🔥 CLAVE: lo mandamos a TODOS los clientes conectados
+    io.emit('chatMessage', enriched)
   })
 
-  socket.on('disconnect', () => {
-    console.log('🔴 Socket desconectado:', socket.id)
+  socket.on('disconnect', reason => {
+    console.log('🔴 Socket desconectado:', socket.id, 'motivo:', reason)
   })
 })
-
-// ============================
-// RUTAS HTTP DE CHAT (con acceso a io)
-// ============================
-// ⚠️ Importante: se crean DESPUÉS de instanciar io
-const chatRoutes = createChatRoutes(io)
-app.use('/api/chat', chatRoutes)
 
 // ============================
 // START SERVER
