@@ -2,12 +2,12 @@
 const express = require('express')
 const router = express.Router()
 const { ChatSession, ChatMessage } = require('../models')
+const { getIo } = require('../socketHub')
 
-// Crear sesión de chat
+// Crear sesión
 router.post('/session', async (req, res) => {
   try {
     const { contact = {}, meta = {}, leadId = null } = req.body || {}
-
     const now = new Date()
 
     const session = await ChatSession.create({
@@ -18,7 +18,6 @@ router.post('/session', async (req, res) => {
       status: 'open',
       startedAt: now,
       lastActivityAt: now,
-
       sourceUrl: meta.sourceUrl || null,
       userAgent: meta.userAgent || req.headers['user-agent'] || null,
       language: meta.language || null,
@@ -35,7 +34,7 @@ router.post('/session', async (req, res) => {
   }
 })
 
-// Actualizar datos de contacto de la sesión (opcional)
+// Actualizar contacto
 router.patch('/session/:id/contact', async (req, res) => {
   try {
     const { id } = req.params
@@ -56,21 +55,19 @@ router.patch('/session/:id/contact', async (req, res) => {
     res.json({ ok: true, session })
   } catch (err) {
     console.error('Error actualizando contacto de chat:', err)
-    res
-      .status(500)
-      .json({ ok: false, error: 'Error actualizando contacto de chat' })
+    res.status(500).json({ ok: false, error: 'Error actualizando contacto de chat' })
   }
 })
 
-// Guardar mensaje
+// ===============================
+// GUARDAR MENSAJE + BROADCAST WS
+// ===============================
 router.post('/message', async (req, res) => {
   try {
     const { sessionId, text, sender = 'user', meta = null } = req.body || {}
 
     if (!sessionId || !text) {
-      return res
-        .status(400)
-        .json({ ok: false, error: 'sessionId y text son obligatorios' })
+      return res.status(400).json({ ok: false, error: 'sessionId y text son obligatorios' })
     }
 
     const session = await ChatSession.findByPk(sessionId)
@@ -88,6 +85,18 @@ router.post('/message', async (req, res) => {
     session.lastActivityAt = new Date()
     await session.save()
 
+    // 🔥 ENVIAR MENSAJE EN TIEMPO REAL
+    const io = getIo()
+    if (io) {
+      io.to(String(sessionId)).emit('chatMessage', {
+        sessionId,
+        from: sender,
+        message: text,
+        id: message.id,
+        createdAt: message.createdAt,
+      })
+    }
+
     res.json({ ok: true, message })
   } catch (err) {
     console.error('Error guardando mensaje de chat:', err)
@@ -95,12 +104,10 @@ router.post('/message', async (req, res) => {
   }
 })
 
-// Listar sesiones (para el CRM)
+// Listar sesiones
 router.get('/sessions', async (req, res) => {
   try {
     const sessions = await ChatSession.findAll({
-      // 🔴 ANTES: order: [['lastActivityAt', 'DESC']],
-      // ✅ AHORA: usamos updatedAt que siempre existe
       order: [['updatedAt', 'DESC']],
     })
     res.json({ ok: true, sessions })
@@ -110,7 +117,7 @@ router.get('/sessions', async (req, res) => {
   }
 })
 
-// Traer mensajes de una sesión
+// Listar mensajes
 router.get('/sessions/:id/messages', async (req, res) => {
   try {
     const { id } = req.params
@@ -128,9 +135,7 @@ router.get('/sessions/:id/messages', async (req, res) => {
     res.json({ ok: true, session, messages })
   } catch (err) {
     console.error('Error obteniendo mensajes de chat:', err)
-    res
-      .status(500)
-      .json({ ok: false, error: 'Error obteniendo mensajes de la sesión' })
+    res.status(500).json({ ok: false, error: 'Error obteniendo mensajes' })
   }
 })
 

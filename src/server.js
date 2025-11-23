@@ -5,17 +5,16 @@ const cors = require('cors')
 const http = require('http')
 const { Server } = require('socket.io')
 const { testConnection, sequelize } = require('./config/db')
+const { setIo } = require('./socketHub')
 
-// Importar modelos (Sequelize los registra)
+// Import models
 require('./models')
 
 // Rutas
 const leadRoutes = require('./router/leadRoutes')
 const chatRoutes = require('./router/chatRoutes')
 
-// ============================
-// EXPRESS APP
-// ============================
+// INIT EXPRESS
 const app = express()
 
 // ============================
@@ -30,13 +29,7 @@ const allowedOrigins = [
   'http://localhost:3000',
 ]
 
-app.use(
-  cors({
-    origin: allowedOrigins,
-    credentials: true,
-  })
-)
-
+app.use(cors({ origin: allowedOrigins, credentials: true }))
 app.use(express.json())
 
 // ============================
@@ -46,7 +39,6 @@ app.get('/', (req, res) => {
   res.json({ ok: true, message: 'API Solar Calculator funcionando' })
 })
 
-// Prueba
 app.get('/api/chat/ping', (req, res) => {
   res.json({ ok: true, message: 'chat API viva' })
 })
@@ -66,22 +58,23 @@ const io = new Server(server, {
   },
 })
 
-// Manejo de WebSocket
+setIo(io) // <-- REGISTRA EL IO GLOBAL
+
 io.on('connection', socket => {
   console.log('🟢 Socket conectado:', socket.id)
 
   socket.on('joinSession', ({ sessionId }) => {
     if (!sessionId) return
-    socket.join(sessionId)
-    socket.data.sessionId = sessionId
+    socket.join(String(sessionId))
+    socket.data.sessionId = String(sessionId)
     console.log(`👉 ${socket.id} entró a la sesión ${sessionId}`)
   })
 
   socket.on('chatMessage', payload => {
-    const { sessionId } = payload
+    const { sessionId } = payload || {}
     if (!sessionId) return
 
-    io.to(sessionId).emit('chatMessage', {
+    io.to(String(sessionId)).emit('chatMessage', {
       ...payload,
       createdAt: new Date().toISOString(),
     })
@@ -101,7 +94,6 @@ async function start() {
   try {
     await testConnection()
 
-    // Migraciones automáticas
     await sequelize.sync({ alter: true })
     console.log('[DB] Migraciones sincronizadas')
 
