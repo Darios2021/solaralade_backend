@@ -1,4 +1,4 @@
-// src/server.js
+// server.js
 require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
@@ -34,7 +34,7 @@ app.use(
   cors({
     origin: allowedOrigins,
     credentials: true,
-  })
+  }),
 )
 
 app.use(express.json())
@@ -46,7 +46,6 @@ app.get('/', (req, res) => {
   res.json({ ok: true, message: 'API Solar Calculator funcionando' })
 })
 
-// Prueba
 app.get('/api/chat/ping', (req, res) => {
   res.json({ ok: true, message: 'chat API viva' })
 })
@@ -66,46 +65,36 @@ const io = new Server(server, {
   },
 })
 
+// hacemos visible io dentro de las rutas
+app.set('io', io)
+
 // Manejo de WebSocket
 io.on('connection', socket => {
-  const role = socket.handshake?.auth?.role || 'unknown'
-  console.log('🟢 Socket conectado:', socket.id, 'role=', role)
+  console.log('🟢 Socket conectado:', socket.id)
 
-  // Lo dejo por si a futuro querés rooms, pero hoy no dependemos de esto
   socket.on('joinSession', ({ sessionId }) => {
     if (!sessionId) return
-    socket.join(sessionId)
-    socket.data.sessionId = sessionId
-    console.log(`👉 ${socket.id} entró a la sesión ${sessionId}`)
+    const roomId = String(sessionId)
+    socket.join(roomId)
+    socket.data.sessionId = roomId
+    console.log(`👉 ${socket.id} entró a la sesión ${roomId}`)
   })
 
   socket.on('chatMessage', payload => {
-    const { sessionId } = payload || {}
+    const sessionId = payload?.sessionId
+    if (!sessionId) return
 
-    const enriched = {
+    const roomId = String(sessionId)
+
+    io.to(roomId).emit('chatMessage', {
       ...payload,
-      sessionId: sessionId || socket.data.sessionId || null,
+      sessionId: roomId,
       createdAt: new Date().toISOString(),
-    }
-
-    if (!enriched.sessionId) {
-      console.warn(
-        '[WS] chatMessage SIN sessionId, payload=',
-        JSON.stringify(payload),
-      )
-    } else {
-      console.log(
-        `[WS] chatMessage de ${socket.id} role=${role} → sesión ${enriched.sessionId}:`,
-        enriched.message || enriched.text,
-      )
-    }
-
-    // 🔥 CLAVE: lo mandamos a TODOS los clientes conectados
-    io.emit('chatMessage', enriched)
+    })
   })
 
-  socket.on('disconnect', reason => {
-    console.log('🔴 Socket desconectado:', socket.id, 'motivo:', reason)
+  socket.on('disconnect', () => {
+    console.log('🔴 Socket desconectado:', socket.id)
   })
 })
 
