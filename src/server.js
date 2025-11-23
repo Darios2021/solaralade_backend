@@ -5,16 +5,17 @@ const cors = require('cors')
 const http = require('http')
 const { Server } = require('socket.io')
 const { testConnection, sequelize } = require('./config/db')
-const { setIo } = require('./socketHub')
 
-// Import models
+// Importar modelos (Sequelize los registra)
 require('./models')
 
 // Rutas
 const leadRoutes = require('./router/leadRoutes')
-const chatRoutes = require('./router/chatRoutes')
+const createChatRoutes = require('./router/chatRoutes')
 
-// INIT EXPRESS
+// ============================
+// EXPRESS APP
+// ============================
 const app = express()
 
 // ============================
@@ -29,22 +30,29 @@ const allowedOrigins = [
   'http://localhost:3000',
 ]
 
-app.use(cors({ origin: allowedOrigins, credentials: true }))
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+  })
+)
+
 app.use(express.json())
 
 // ============================
-// RUTAS HTTP
+// RUTAS HTTP BÁSICAS
 // ============================
 app.get('/', (req, res) => {
   res.json({ ok: true, message: 'API Solar Calculator funcionando' })
 })
 
+// ping simple de chat
 app.get('/api/chat/ping', (req, res) => {
   res.json({ ok: true, message: 'chat API viva' })
 })
 
+// Leads (HTTP puro)
 app.use('/api/leads', leadRoutes)
-app.use('/api/chat', chatRoutes)
 
 // ============================
 // HTTP SERVER + SOCKET.IO
@@ -58,24 +66,27 @@ const io = new Server(server, {
   },
 })
 
-setIo(io) // <-- REGISTRA EL IO GLOBAL
-
+// Manejo de WebSocket
 io.on('connection', socket => {
   console.log('🟢 Socket conectado:', socket.id)
 
   socket.on('joinSession', ({ sessionId }) => {
     if (!sessionId) return
-    socket.join(String(sessionId))
-    socket.data.sessionId = String(sessionId)
-    console.log(`👉 ${socket.id} entró a la sesión ${sessionId}`)
+    const room = String(sessionId)
+    socket.join(room)
+    socket.data.sessionId = room
+    console.log(`👉 ${socket.id} entró a la sesión ${room}`)
   })
 
   socket.on('chatMessage', payload => {
     const { sessionId } = payload || {}
     if (!sessionId) return
 
-    io.to(String(sessionId)).emit('chatMessage', {
+    const room = String(sessionId)
+
+    io.to(room).emit('chatMessage', {
       ...payload,
+      sessionId: room,
       createdAt: new Date().toISOString(),
     })
   })
@@ -86,14 +97,22 @@ io.on('connection', socket => {
 })
 
 // ============================
+// RUTAS HTTP DE CHAT (con acceso a io)
+// ============================
+// ⚠️ Importante: se crean DESPUÉS de instanciar io
+const chatRoutes = createChatRoutes(io)
+app.use('/api/chat', chatRoutes)
+
+// ============================
 // START SERVER
 // ============================
 const PORT = process.env.PORT || 4000
 
-async function start() {
+async function start () {
   try {
     await testConnection()
 
+    // Migraciones automáticas
     await sequelize.sync({ alter: true })
     console.log('[DB] Migraciones sincronizadas')
 
