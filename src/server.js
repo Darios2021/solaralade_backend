@@ -66,26 +66,48 @@ const io = new Server(server, {
   },
 })
 
+// helper para contar agentes conectados
+function broadcastAgentsOnline () {
+  const room = io.sockets.adapter.rooms.get('agents')
+  const count = room ? room.size : 0
+
+  // solo a widgets
+  io.to('widgets').emit('agentsOnline', { count })
+}
+
 // Manejo de WebSocket
 io.on('connection', socket => {
   const role = (socket.handshake.query && socket.handshake.query.role) || 'widget'
 
   console.log('🟢 Socket conectado:', socket.id, 'role =', role)
 
-  // Metemos a todos en rooms lógicas por rol
+  // Rooms lógicas por rol
   if (role === 'agent') {
     socket.join('agents')
+    broadcastAgentsOnline()
   } else {
     socket.join('widgets')
   }
 
-  // (la room por sesión queda disponible si la querés usar más adelante)
+  // Room por sesión (si lo querés usar)
   socket.on('joinSession', ({ sessionId }) => {
     if (!sessionId) return
     const room = String(sessionId)
     socket.join(room)
     socket.data.sessionId = room
     console.log(`👉 ${socket.id} entró a la sesión ${room}`)
+  })
+
+  // Indicador "agente está escribiendo"
+  socket.on('agentTyping', payload => {
+    if (!payload) return
+    const sessionId = String(payload.sessionId || '')
+    if (!sessionId) return
+
+    const typing = !!payload.typing
+
+    // se lo mandamos SOLO al widget de esa sesión
+    io.to(sessionId).emit('agentTyping', { sessionId, typing })
   })
 
   // Mensajes de chat
@@ -104,25 +126,27 @@ io.on('connection', socket => {
       createdAt: new Date().toISOString(),
     }
 
-    // Log para depurar
     console.log('💬 chatMessage recibido:', baseMsg)
 
-    // Si viene del AGENTE -> se lo mando a todos los widgets
     if (from === 'agent') {
-      // a todos los widgets menos el emisor (que es un agente)
+      // Mensaje desde CRM → a widgets
       socket.to('widgets').emit('chatMessage', baseMsg)
     } else {
-      // Viene del usuario/widget/bot -> se lo mando a TODOS los agentes (CRM)
+      // Mensaje desde widget / bot / user → a agentes
       socket.to('agents').emit('chatMessage', baseMsg)
     }
 
-    // Opcional: si querés que los participantes de esa sesión
-    // también lo reciban por la room de la sesión:
-    // io.to(sessionId).emit('chatMessage', baseMsg)
+    // Opcional: también por room de sesión
+    io.to(sessionId).emit('chatMessage', baseMsg)
   })
 
   socket.on('disconnect', () => {
     console.log('🔴 Socket desconectado:', socket.id, 'role =', role)
+
+    if (role === 'agent') {
+      // re-broadcast de presencia
+      broadcastAgentsOnline()
+    }
   })
 })
 
@@ -135,7 +159,6 @@ async function start () {
   try {
     await testConnection()
 
-    // Migraciones automáticas
     await sequelize.sync({ alter: true })
     console.log('[DB] Migraciones sincronizadas')
 
