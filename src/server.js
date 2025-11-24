@@ -136,6 +136,18 @@ io.on('connection', socket => {
     io.to(sessionId).emit('agentTyping', { sessionId, typing })
   })
 
+  // 👇 INDICADOR "USUARIO ESTÁ ESCRIBIENDO" (widget → agentes)
+  socket.on('userTyping', payload => {
+    if (!payload) return
+    const sessionId = String(payload.sessionId || '')
+    if (!sessionId) return
+
+    const typing = !!payload.typing
+
+    // se lo mandamos SOLO a los agentes (CRM), para esa sesión
+    socket.to('agents').emit('userTyping', { sessionId, typing })
+  })
+
   // Mensajes de chat
   socket.on('chatMessage', payload => {
     if (!payload) return
