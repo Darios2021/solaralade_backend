@@ -66,15 +66,13 @@ const io = new Server(server, {
   },
 })
 
-// ====== PRESENCIA POR SESIÓN ======
-// Map: sessionId -> Set(socketId de agentes en ese chat)
-const agentPresenceBySession = new Map()
+// helper para contar agentes conectados
+function broadcastAgentsOnline () {
+  const room = io.sockets.adapter.rooms.get('agents')
+  const count = room ? room.size : 0
 
-function updateSessionAgents (sessionId) {
-  const set = agentPresenceBySession.get(sessionId)
-  const count = set ? set.size : 0
-  // Solo lo ve el widget de ESA sesión
-  io.to(sessionId).emit('agentsOnline', { sessionId, count })
+  // solo a widgets
+  io.to('widgets').emit('agentsOnline', { count })
 }
 
 // Manejo de WebSocket
@@ -83,45 +81,21 @@ io.on('connection', socket => {
 
   console.log('🟢 Socket conectado:', socket.id, 'role =', role)
 
-  // Rooms lógicas por rol (para broadcast de mensajes, NO para presencia)
+  // Rooms lógicas por rol
   if (role === 'agent') {
     socket.join('agents')
-    console.log(`👮 Agente conectado: ${socket.id}`)
+    broadcastAgentsOnline()
   } else {
     socket.join('widgets')
-    console.log(`👤 Widget conectado: ${socket.id}`)
   }
 
   // Room por sesión
   socket.on('joinSession', ({ sessionId }) => {
     if (!sessionId) return
     const room = String(sessionId)
-
     socket.join(room)
+    socket.data.sessionId = room
     console.log(`👉 ${socket.id} entró a la sesión ${room}`)
-
-    // Si es agente, marcamos presencia SOLO en esa sesión
-    if (role === 'agent') {
-      const prev = socket.data.currentSessionId
-      // Si antes estaba "parado" en otra sesión, lo sacamos de la anterior
-      if (prev && prev !== room) {
-        const prevSet = agentPresenceBySession.get(prev)
-        if (prevSet && prevSet.delete(socket.id)) {
-          if (!prevSet.size) agentPresenceBySession.delete(prev)
-          updateSessionAgents(prev)
-        }
-      }
-
-      socket.data.currentSessionId = room
-
-      let set = agentPresenceBySession.get(room)
-      if (!set) {
-        set = new Set()
-        agentPresenceBySession.set(room, set)
-      }
-      set.add(socket.id)
-      updateSessionAgents(room) // Notificamos al widget de ESA sesión
-    }
   })
 
   // Indicador "agente está escribiendo"
@@ -155,29 +129,25 @@ io.on('connection', socket => {
     console.log('💬 chatMessage recibido:', baseMsg)
 
     if (from === 'agent') {
-      // Mensaje desde CRM → a widget de esa sesión
-      io.to(sessionId).emit('chatMessage', baseMsg)
+      // Mensaje desde CRM → a widgets (NOTA: excluimos el socket emisor)
+      socket.to('widgets').emit('chatMessage', baseMsg)
     } else {
-      // Mensaje desde widget / bot / user → a todos los agentes
+      // Mensaje desde widget / bot / user → a agentes
       socket.to('agents').emit('chatMessage', baseMsg)
-      // y también al room de sesión (por si hay más de un agente mirando)
-      io.to(sessionId).emit('chatMessage', baseMsg)
     }
+
+    // IMPORTANTE: antes era io.to(sessionId)
+    // Esto reenviaba TAMBIÉN al mismo socket que lo mandó → duplicados en el CRM.
+    // Con socket.to(sessionId) excluimos al emisor.
+    socket.to(sessionId).emit('chatMessage', baseMsg)
   })
 
   socket.on('disconnect', () => {
     console.log('🔴 Socket desconectado:', socket.id, 'role =', role)
 
     if (role === 'agent') {
-      // Lo sacamos de cualquier sesión donde estuviera presente
-      for (const [sessionId, set] of agentPresenceBySession.entries()) {
-        if (set.delete(socket.id)) {
-          if (!set.size) {
-            agentPresenceBySession.delete(sessionId)
-          }
-          updateSessionAgents(sessionId)
-        }
-      }
+      // re-broadcast de presencia
+      broadcastAgentsOnline()
     }
   })
 })
