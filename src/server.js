@@ -95,7 +95,7 @@ io.on('connection', socket => {
     broadcastAgentsOnline()
   }
 
-  // Room por sesión (si lo querés usar)
+  // Room por sesión
   socket.on('joinSession', ({ sessionId }) => {
     if (!sessionId) return
     const room = String(sessionId)
