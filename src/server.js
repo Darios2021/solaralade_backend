@@ -88,11 +88,11 @@ io.on('connection', socket => {
     broadcastAgentsOnline()
   } else {
     socket.join('widgets')
-    // cuando se conecta un widget nuevo, le mandamos el estado actual
+    // cuando entra un widget nuevo, le mandamos el estado actual
     broadcastAgentsOnline()
   }
 
-  // Room por sesión (si lo querés usar)
+  // Room por sesión
   socket.on('joinSession', ({ sessionId }) => {
     if (!sessionId) return
     const room = String(sessionId)
@@ -139,7 +139,7 @@ io.on('connection', socket => {
       socket.to('agents').emit('chatMessage', baseMsg)
     }
 
-    // Opcional: también por room de sesión
+    // También por room de sesión
     io.to(sessionId).emit('chatMessage', baseMsg)
   })
 
