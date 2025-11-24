@@ -84,9 +84,12 @@ io.on('connection', socket => {
   // Rooms lógicas por rol
   if (role === 'agent') {
     socket.join('agents')
+    // cuando se conecta un agente, avisamos a todos los widgets
     broadcastAgentsOnline()
   } else {
     socket.join('widgets')
+    // cuando se conecta un widget nuevo, le mandamos el estado actual
+    broadcastAgentsOnline()
   }
 
   // Room por sesión (si lo querés usar)
