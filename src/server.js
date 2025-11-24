@@ -84,11 +84,12 @@ io.on('connection', socket => {
   // Rooms lógicas por rol
   if (role === 'agent') {
     socket.join('agents')
-    // cuando se conecta un agente, avisamos a todos los widgets
+    // cada vez que entra un agente, avisamos a todos los widgets
     broadcastAgentsOnline()
   } else {
     socket.join('widgets')
-    // cuando entra un widget nuevo, le mandamos el estado actual
+    // 🔹 IMPORTANTE: cuando entra un widget,
+    // también le mandamos el estado actual de agentes
     broadcastAgentsOnline()
   }
 
@@ -139,7 +140,7 @@ io.on('connection', socket => {
       socket.to('agents').emit('chatMessage', baseMsg)
     }
 
-    // También por room de sesión
+    // Opcional: también por room de sesión
     io.to(sessionId).emit('chatMessage', baseMsg)
   })
 
@@ -147,7 +148,7 @@ io.on('connection', socket => {
     console.log('🔴 Socket desconectado:', socket.id, 'role =', role)
 
     if (role === 'agent') {
-      // re-broadcast de presencia
+      // re-broadcast de presencia cuando se va un agente
       broadcastAgentsOnline()
     }
   })
