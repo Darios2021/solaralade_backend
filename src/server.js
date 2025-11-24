@@ -77,20 +77,21 @@ function broadcastAgentsOnline () {
 
 // Manejo de WebSocket
 io.on('connection', socket => {
-  const role =
-    (socket.handshake.query && socket.handshake.query.role) || 'widget'
+  const role = (socket.handshake.query && socket.handshake.query.role) || 'widget'
 
   console.log('🟢 Socket conectado:', socket.id, 'role =', role)
 
   // Rooms lógicas por rol
   if (role === 'agent') {
     socket.join('agents')
-    // avisamos a todos los widgets cuántos agentes hay
+    console.log(`👮 Agente conectado: ${socket.id}`)
+    // Actualizamos presencia para TODOS los widgets
     broadcastAgentsOnline()
   } else {
+    // visitor/widget
     socket.join('widgets')
-    // 🔹 IMPORTANTE: cuando entra un widget nuevo,
-    // también le mandamos el estado actual de agentes online
+    console.log(`👤 Widget conectado: ${socket.id}`)
+    // Cuando entra un widget nuevo, también le mandamos el estado actual
     broadcastAgentsOnline()
   }
 
@@ -149,11 +150,8 @@ io.on('connection', socket => {
     console.log('🔴 Socket desconectado:', socket.id, 'role =', role)
 
     if (role === 'agent') {
-      // re-broadcast de presencia cuando se va un agente
+      // re-broadcast de presencia
       broadcastAgentsOnline()
-    } else if (role !== 'agent') {
-      // opcional: podrías volver a emitir también para widgets,
-      // pero en este caso no afecta el conteo de agentes
     }
   })
 })
