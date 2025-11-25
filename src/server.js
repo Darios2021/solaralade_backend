@@ -136,7 +136,7 @@ io.on('connection', socket => {
     io.to(sessionId).emit('agentTyping', { sessionId, typing })
   })
 
-  // 👇 INDICADOR "USUARIO ESTÁ ESCRIBIENDO" (widget → agentes)
+  // 👇 Indicador "usuario está escribiendo" (widget → agentes)
   socket.on('userTyping', payload => {
     if (!payload) return
     const sessionId = String(payload.sessionId || '')
@@ -171,10 +171,9 @@ io.on('connection', socket => {
       //    EXCLUIMOS al agente emisor para que en el CRM no se duplique
       socket.to(sessionId).emit('chatMessage', baseMsg)
     } else {
-      // Mensaje desde widget / bot / user → a todos los agentes
-      socket.to('agents').emit('chatMessage', baseMsg)
-      // y también al room de sesión (por si hay más de un agente mirando)
-      io.to(sessionId).emit('chatMessage', baseMsg)
+      // 👉 Mensaje desde widget / bot / user → SOLO a agentes
+      //    (el widget ya lo agrega localmente, no queremos eco)
+      io.to('agents').emit('chatMessage', baseMsg)
     }
   })
 
