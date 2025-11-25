@@ -66,6 +66,9 @@ const io = new Server(server, {
   },
 })
 
+// 👉 Esto permite que chatRoutes use req.app.get('io')
+app.set('io', io)
+
 // ====== PRESENCIA POR SESIÓN ======
 // Map: sessionId -> Set(socketId de agentes en ese chat)
 const agentPresenceBySession = new Map()
@@ -136,7 +139,7 @@ io.on('connection', socket => {
     io.to(sessionId).emit('agentTyping', { sessionId, typing })
   })
 
-  // 👇 Indicador "usuario está escribiendo" (widget → agentes)
+  // INDICADOR "USUARIO ESTÁ ESCRIBIENDO" (widget → agentes)
   socket.on('userTyping', payload => {
     if (!payload) return
     const sessionId = String(payload.sessionId || '')
@@ -148,7 +151,9 @@ io.on('connection', socket => {
     socket.to('agents').emit('userTyping', { sessionId, typing })
   })
 
-  // Mensajes de chat
+  // (opcional) handler genérico para chatMessage vía WS
+  // 👉 en el flujo actual NO lo usamos desde frontend, pero lo dejamos
+  //    por si en el futuro querés algún mensaje 100% WS.
   socket.on('chatMessage', payload => {
     if (!payload) return
 
@@ -164,16 +169,13 @@ io.on('connection', socket => {
       createdAt: new Date().toISOString(),
     }
 
-    console.log('💬 chatMessage recibido:', baseMsg)
+    console.log('💬 [WS] chatMessage recibido:', baseMsg)
 
     if (from === 'agent') {
-      // 👉 Mensaje desde CRM → a widget de esa sesión
-      //    EXCLUIMOS al agente emisor para que en el CRM no se duplique
       socket.to(sessionId).emit('chatMessage', baseMsg)
     } else {
-      // 👉 Mensaje desde widget / bot / user → SOLO a agentes
-      //    (el widget ya lo agrega localmente, no queremos eco)
-      io.to('agents').emit('chatMessage', baseMsg)
+      socket.to('agents').emit('chatMessage', baseMsg)
+      io.to(sessionId).emit('chatMessage', baseMsg)
     }
   })
 
